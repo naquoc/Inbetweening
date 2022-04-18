@@ -8,15 +8,17 @@ import torch.nn.functional as F
 import skimage.io as io
 import numpy as np
 import os
+from PIL import Image
+
 
 import models
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--img0Path", type=str, default='./images/f_032242.png', help='input image0 path')
-parser.add_argument("--img1Path", type=str, default='./images/f_032246.png', help='input image1 path')
-parser.add_argument("--sketPath", type=str, default='./images/f_032244_sket.png', help='input sketch_t path')
-parser.add_argument("--saveImgPath", type=str, default='./images/f_032244_It.png', help='saved image It path')
+parser.add_argument("--img0Path", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/color/0003.TGA', help='input image0 path')
+parser.add_argument("--img1Path", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/color/0005.TGA', help='input image1 path')
+parser.add_argument("--sketPath", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/sketch/0004.TGA', help='input sketch_t path')
+parser.add_argument("--saveImgPath", type=str, default='./images/10_0004.png', help='saved image It path')
 parser.add_argument("--modelPath", type=str, default='./checkpoints/frame_synthesis_model.ckpt', help='checkpoint path')
 args = parser.parse_args()
     
@@ -31,8 +33,8 @@ imagExt = models.PWCExtractor()
 flowEst = models.Network()
 blenEst = models.blendNet()
 
-W = 576
-H = 384
+W = 2048 #576
+H = 1024
 flowBackWarp = models.backWarp(W, H)
 occlusiCheck = models.occlusionCheck(W, H)
 
@@ -70,13 +72,20 @@ revtransf = transforms.Compose([transforms.ToPILImage()])
 
 L1_lossFn = models.L1Loss()
 
-img0 = io.imread(args.img0Path).astype(np.float32)/255.0
-img1 = io.imread(args.img1Path).astype(np.float32)/255.0
-sket = io.imread(args.sketPath)[np.newaxis, :, :].astype(np.float32)/255.0
+# img0 = io.imread(args.img0Path).astype(np.float32)/255.0
+# img1 = io.imread(args.img1Path).astype(np.float32)/255.0
+# sket = io.imread(args.sketPath)[np.newaxis, :, :].astype(np.float32)/255.0
+
+img0 = np.array(Image.open(args.img0Path).convert('RGB').resize((W, H), Image.BILINEAR)).astype(np.float32)/255.0
+img1 = np.array(Image.open(args.img1Path).convert('RGB').resize((W, H), Image.BILINEAR)).astype(np.float32)/255.0
+sket = np.array(Image.open(args.sketPath).convert('L').resize((W, H), Image.BILINEAR))[np.newaxis, :, :].astype(np.float32)/255.0
 
 img0 = transform(img0).unsqueeze(0).to(device)
 img1 = transform(img1).unsqueeze(0).to(device)
 sket = torch.from_numpy(sket).unsqueeze(0).to(device)
+
+print(img0.shape)
+print(sket.shape)
 
 # flow estimation
 imgt_temp = netT(torch.cat((sket, img0, img1), dim = 1))

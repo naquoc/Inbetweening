@@ -14,9 +14,9 @@ class SuperSloMo(data.Dataset):
         sketchPath = []
         
         if train:
-            clips = os.listdir(os.path.join(root, 'frame'))[0:-100]
+            clips = os.listdir(os.path.join(root, 'frame'))[0:-300]
         else:
-            clips = os.listdir(os.path.join(root, 'frame'))[-100:]
+            clips = os.listdir(os.path.join(root, 'frame'))[-300:]
         
         for folder in clips:
             
@@ -24,8 +24,10 @@ class SuperSloMo(data.Dataset):
             sktchPath = os.path.join(root, 'sketch', folder)
             
             frameList = sorted(os.listdir(clipsPath))
+            if len(frameList) <= 6:
+                continue
             sketcList = sorted(os.listdir(sktchPath))
-            
+
             indexNum  = int((len(frameList) - 1) / (frm_num - 1))
             
             for i in range(indexNum):

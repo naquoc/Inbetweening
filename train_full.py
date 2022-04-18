@@ -13,18 +13,18 @@ import dataloader_full
 # For parsing commandline arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset_dir", type=str, default='./dataset')
-parser.add_argument("--checkpt_dir", type=str, default='./checkpoints')
+parser.add_argument("--checkpt_dir", type=str, default='./checkpoints_toei_full')
 parser.add_argument("--cont", type=bool, default=False, help='set to True and set `checkpoint` path.')
-parser.add_argument("--contpt", type=str, default='./checkpoints/.ckpt', help='path of checkpoint for pretrained model')
+parser.add_argument("--contpt", type=str, default='/home/akari/Inbetweening/checkpoints_toei_full/toei_full_model_best.ckpt', help='path of checkpoint for pretrained model')
 parser.add_argument("--init_lr", type=float, default=0.0001, help='set initial learning rate.')
 parser.add_argument("--epochs", type=int, default=100, help='number of epochs to train.')
-parser.add_argument("--batch_size", type=int, default=4, help='batch size for training.')
-parser.add_argument("--checkpoint_epoch", type=int, default=5, help='checkpoint saving frequency. N: after every N epochs.')
+parser.add_argument("--batch_size", type=int, default=2, help='batch size for training.')
+parser.add_argument("--checkpoint_epoch", type=int, default=1, help='checkpoint saving frequency. N: after every N epochs.')
 parser.add_argument("--frm_num", type=int, default=7)
 args = parser.parse_args()
 
 log_name = './log/full_model'
-cpt_name = '/full_model_' 
+cpt_name = '/toei_full_model_' 
 
 writer = SummaryWriter(log_name)
 
@@ -32,7 +32,7 @@ print("torch.cuda.is_available: ", torch.cuda.is_available())
 print("torch.cuda.device_count: ", torch.cuda.device_count())
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-multiGPUs = [0, 1, 2, 3]
+multiGPUs = [0, 1]
 
 netT   = models.ResNet()
 sketExt = models.PWCExtractor()
@@ -42,7 +42,7 @@ blenEst = models.blendNet()
 flowRef = models.UNet(14, 8)
 ImagRef = model_deform.DeformUNet(21, 15)
 
-W = 576
+W = 512
 H = 384
 flowBackWarp = models.backWarp(W, H)
 occlusiCheck = models.occlusionCheck(W, H)
@@ -104,7 +104,7 @@ if args.cont:
     ImagRef.load_state_dict(model_dict['state_dict_ImagRef'])
 else:
     start_epoch = 0
-    model_dict = torch.load('./checkpoints/frame_synthesis_model.ckpt')
+    model_dict = torch.load('./checkpoints_toei/toei_frame_synthesis_model_best.ckpt')
     netT.load_state_dict(model_dict['state_dict_netT'])
     sketExt.load_state_dict(model_dict['state_dict_sketExt'])
     imagExt.load_state_dict(model_dict['state_dict_imagExt'])
@@ -235,6 +235,8 @@ def validate():
             tloss += recnLoss.item()  
             
     return tloss / len(valid_loader)
+
+min_vLoss = None
 
 # Main training loop
 
@@ -403,3 +405,6 @@ for epoch in range(start_epoch, args.epochs):
                 'state_dict_flowRef': flowRef.state_dict(),
                 'state_dict_ImagRef': ImagRef.state_dict()}
         torch.save(dict1, args.checkpt_dir + cpt_name + str(epoch) + ".ckpt")
+        if min_vLoss is None or vLoss <= min_vLoss:
+            min_vLoss = vLoss
+            torch.save(dict1, args.checkpt_dir + cpt_name + 'best' + ".ckpt")

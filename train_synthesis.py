@@ -13,9 +13,9 @@ import dataloader_syn
 # For parsing commandline arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset_dir", type=str, default='./dataset')
-parser.add_argument("--checkpt_dir", type=str, default='./checkpoints')
-parser.add_argument("--cont", type=bool, default=False, help='set to True and set `checkpoint` path.')
-parser.add_argument("--contpt", type=str, default='./checkpoints/.ckpt', help='path of checkpoint for pretrained model')
+parser.add_argument("--checkpt_dir", type=str, default='./checkpoints_toei')
+parser.add_argument("--cont", type=bool, default=True, help='set to True and set `checkpoint` path.')
+parser.add_argument("--contpt", type=str, default='/home/akari/Inbetweening/checkpoints_toei/toei_frame_synthesis_model_24.ckpt', help='path of checkpoint for pretrained model')
 parser.add_argument("--init_lr", type=float, default=0.0001, help='set initial learning rate.')
 parser.add_argument("--epochs", type=int, default=100, help='number of epochs to train.')
 parser.add_argument("--batch_size", type=int, default=4, help='batch size for training.')
@@ -23,7 +23,7 @@ parser.add_argument("--checkpoint_epoch", type=int, default=1, help='checkpoint 
 args = parser.parse_args()
 
 log_name = './log/frame_synthesis'
-cpt_name = '/frame_synthesis_model_'
+cpt_name = '/toei_frame_synthesis_model_'
 
 writer = SummaryWriter(log_name)
 
@@ -31,7 +31,7 @@ print("torch.cuda.is_available: ", torch.cuda.is_available())
 print("torch.cuda.device_count: ", torch.cuda.device_count())
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-multiGPUs = [0, 1, 2, 3]
+multiGPUs = [0, 1]
     
 netT   = models.ResNet()
 sketExt = models.PWCExtractor()
@@ -39,20 +39,21 @@ imagExt = models.PWCExtractor()
 flowEst = models.Network()
 blenEst = models.blendNet()
 
-W = 576
+W = 512
 H = 384
 flowBackWarp = models.backWarp(W, H)
 occlusiCheck = models.occlusionCheck(W, H)
 EdgeDet = model_hed.Network()
-EdgeDet.load_state_dict(torch.load('./checkpoints/hed.pkl'))
+EdgeDet.load_state_dict(torch.load('/home/akari/checkpoints/hed.pkl', map_location='cuda:0'))
 
 if args.cont == False:
-    pretrained_dict = torch.load('./checkpoints/pwcnet.pkl')
+    pretrained_dict = torch.load('/home/akari/checkpoints/pwcnet.pkl', map_location='cuda:0')
     sketExt.load_state_dict(pretrained_dict, strict=False)
     imagExt.load_state_dict(pretrained_dict, strict=False)
     flowEst.load_state_dict(pretrained_dict, strict=False)
 
 if torch.cuda.device_count() >= 1:
+    print('DATA PARALLEL')
     netT = nn.DataParallel(netT, device_ids=multiGPUs)
     sketExt = nn.DataParallel(sketExt, device_ids=multiGPUs)
     imagExt = nn.DataParallel(imagExt, device_ids=multiGPUs)
@@ -97,7 +98,7 @@ params = list(netT.parameters()) + list(sketExt.parameters()) + list(imagExt.par
 optimizer = optim.Adam(params, lr=args.init_lr)
 
 if args.cont:
-    model_dict = torch.load(args.contpt)
+    model_dict = torch.load(args.contpt, map_location='cuda:0')
     start_epoch = model_dict['epoch'] + 1
     optimizer.load_state_dict(model_dict['optim_state_dict'])
     netT.load_state_dict(model_dict['state_dict_netT'])
@@ -151,6 +152,8 @@ def validate():
     return (tloss / len(valid_loader))
 
 
+min_vLoss = None
+
 # Main training loop
 for epoch in range(start_epoch, args.epochs):
     
@@ -162,6 +165,9 @@ for epoch in range(start_epoch, args.epochs):
     for trainIndex, (img0, imgt, img1, sktt, dismap) in enumerate(train_loader):
         
         t0 = time.time()
+
+        print(img0.shape)
+        print(imgt.shape)
         
         img0 = img0.to(device)
         imgt = imgt.to(device)
@@ -247,3 +253,6 @@ for epoch in range(start_epoch, args.epochs):
                 'state_dict_flowEst': flowEst.state_dict(),
                 'state_dict_blenEst': blenEst.state_dict()}
         torch.save(dict1, args.checkpt_dir + cpt_name + str(epoch) + ".ckpt")
+        if min_vLoss is None or vLoss <= min_vLoss:
+            min_vLoss = vLoss
+            torch.save(dict1, args.checkpt_dir + cpt_name + 'best' + ".ckpt")

@@ -11,13 +11,14 @@ import os
 
 import models
 import model_deform
+from PIL import Image
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--img0Path", type=str, default='./images/f_032242.png', help='input image0 path')
-parser.add_argument("--img1Path", type=str, default='./images/f_032246.png', help='input image1 path')
-parser.add_argument("--sketPath", type=str, default='./images/f_032244_sket.png', help='input sketch_t path')
-parser.add_argument("--saveDir", type=str, default='./images', help='saved image It path')
+parser.add_argument("--img0Path", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/color/0003.TGA', help='input image0 path')
+parser.add_argument("--img1Path", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/color/0005.TGA', help='input image1 path')
+parser.add_argument("--sketPath", type=str, default='/home/akari/prj_toei_colorization/backend/app/ai_core_v2/test_data/heavy/10_ggg10_s20_018_RRRS_T_B_CHS_NON/sketch/0004.TGA', help='input sketch_t path')
+parser.add_argument("--saveDir", type=str, default='./result', help='saved image It path')
 parser.add_argument("--modelPath", type=str, default='./checkpoints/full_model.ckpt', help='checkpoint path')
 parser.add_argument("--frm_num", type=int, default=5, help='number of frame to be interpolated')
 args = parser.parse_args()
@@ -35,8 +36,8 @@ blenEst = models.blendNet()
 flowRef = models.UNet(14, 8)
 ImagRef = model_deform.DeformUNet(21, 15)
 
-W = 576
-H = 384
+W = 768
+H = 512
 flowBackWarp = models.backWarp(W, H)
 occlusiCheck = models.occlusionCheck(W, H)
 
@@ -80,9 +81,13 @@ revtransf = transforms.Compose([transforms.ToPILImage()])
 
 L1_lossFn = models.L1Loss()
 
-img0 = io.imread(args.img0Path).astype(np.float32)/255.0
-img1 = io.imread(args.img1Path).astype(np.float32)/255.0
-sket = io.imread(args.sketPath)[np.newaxis, :, :].astype(np.float32)/255.0
+# img0 = io.imread(args.img0Path).astype(np.float32)/255.0
+# img1 = io.imread(args.img1Path).astype(np.float32)/255.0
+# sket = io.imread(args.sketPath)[np.newaxis, :, :].astype(np.float32)/255.0
+
+img0 = np.array(Image.open(args.img0Path).convert('RGB').resize((W, H), Image.BILINEAR)).astype(np.float32)/255.0
+img1 = np.array(Image.open(args.img1Path).convert('RGB').resize((W, H), Image.BILINEAR)).astype(np.float32)/255.0
+sket = np.array(Image.open(args.sketPath).convert('L').resize((W, H), Image.BILINEAR))[np.newaxis, :, :].astype(np.float32)/255.0
 
 img0 = transform(img0).unsqueeze(0).to(device)
 img1 = transform(img1).unsqueeze(0).to(device)

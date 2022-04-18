@@ -16,9 +16,9 @@ class SuperSloMo(data.Dataset):
         dismapPath = []
         
         if train:
-            clips = os.listdir(os.path.join(root, 'frame'))[0:-100]
+            clips = os.listdir(os.path.join(root, 'frame'))[0:-300]
         else:
-            clips = os.listdir(os.path.join(root, 'frame'))[-100:]
+            clips = os.listdir(os.path.join(root, 'frame'))[-300:]
         
         for folder in clips:
             

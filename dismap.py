@@ -125,13 +125,13 @@ torch.backends.cudnn.enabled = True # make sure to use cudnn for computational p
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 EdgeDet = Network(gpu = 0)
-EdgeDet.load_state_dict(torch.load('./checkpoints/hed.pkl'))
+EdgeDet.load_state_dict(torch.load('/home/akari/checkpoints/hed.pkl'))
 
 framDir = './dataset/frame'
 saveDir = './dataset/dismap'
 
 for clipDir in sorted(os.listdir(framDir)):
-    
+    print(clipDir)
     clipPath = os.path.join(framDir, clipDir)
     savePath = os.path.join(saveDir, clipDir)
     if not os.path.exists(savePath):
